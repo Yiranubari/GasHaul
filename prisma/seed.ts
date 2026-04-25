@@ -137,115 +137,115 @@ function calculateTrustScore(
 async function main() {
   console.log("Seeding database...");
 
-  await prisma.$transaction(async (tx) => {
-    for (const v of vendorData) {
-      const trustScore = calculateTrustScore(
-        v.completedOrdersWithFeedback,
-        v.ordersWithIssues,
-      );
-      const flagged = trustScore !== null && trustScore < 60;
+  const tx = prisma;
 
-      const vendor = await tx.vendor.upsert({
-        where: { name: v.name },
-        update: {
-          latitude: v.latitude,
-          longitude: v.longitude,
-          completedOrdersWithFeedback: v.completedOrdersWithFeedback,
-          ordersWithIssues: v.ordersWithIssues,
-          trustScore,
-          flaggedForReview: flagged,
-          isActive: true,
-        },
-        create: {
-          name: v.name,
-          latitude: v.latitude,
-          longitude: v.longitude,
-          completedOrdersWithFeedback: v.completedOrdersWithFeedback,
-          ordersWithIssues: v.ordersWithIssues,
-          trustScore,
-          flaggedForReview: flagged,
-          isActive: true,
-        },
-      });
+  for (const v of vendorData) {
+    const trustScore = calculateTrustScore(
+      v.completedOrdersWithFeedback,
+      v.ordersWithIssues,
+    );
+    const flagged = trustScore !== null && trustScore < 60;
 
-      for (const [size, price] of Object.entries(v.pricing)) {
-        await tx.vendorPricing.upsert({
-          where: {
-            vendorId_cylinderSize: {
-              vendorId: vendor.id,
-              cylinderSize: size as CylinderSize,
-            },
-          },
-          update: { priceKobo: price },
-          create: {
+    const vendor = await tx.vendor.upsert({
+      where: { name: v.name },
+      update: {
+        latitude: v.latitude,
+        longitude: v.longitude,
+        completedOrdersWithFeedback: v.completedOrdersWithFeedback,
+        ordersWithIssues: v.ordersWithIssues,
+        trustScore,
+        flaggedForReview: flagged,
+        isActive: true,
+      },
+      create: {
+        name: v.name,
+        latitude: v.latitude,
+        longitude: v.longitude,
+        completedOrdersWithFeedback: v.completedOrdersWithFeedback,
+        ordersWithIssues: v.ordersWithIssues,
+        trustScore,
+        flaggedForReview: flagged,
+        isActive: true,
+      },
+    });
+
+    for (const [size, price] of Object.entries(v.pricing)) {
+      await tx.vendorPricing.upsert({
+        where: {
+          vendorId_cylinderSize: {
             vendorId: vendor.id,
             cylinderSize: size as CylinderSize,
-            priceKobo: price,
           },
-        });
-      }
-
-      console.log(
-        `  ✓ ${v.name} (${trustScore !== null ? `${trustScore}%` : "New"}${flagged ? ", flagged" : ""})`,
-      );
+        },
+        update: { priceKobo: price },
+        create: {
+          vendorId: vendor.id,
+          cylinderSize: size as CylinderSize,
+          priceKobo: price,
+        },
+      });
     }
 
-    const userPasswordHash = await bcrypt.hash("password123", 10);
-    const testUser = await tx.user.upsert({
-      where: { phone: "+2348030000001" },
-      update: {
-        passwordHash: userPasswordHash,
-        phoneVerified: true,
-      },
-      create: {
-        fullName: "Test User",
-        phone: "+2348030000001",
-        passwordHash: userPasswordHash,
-        phoneVerified: true,
-        smsNotifications: true,
-      },
-    });
+    console.log(
+      `  ✓ ${v.name} (${trustScore !== null ? `${trustScore}%` : "New"}${flagged ? ", flagged" : ""})`,
+    );
+  }
 
-    await tx.address.upsert({
-      where: { userId: testUser.id },
-      update: {
-        streetAddress: "12 Awolowo Road",
-        area: "Ikoyi",
-        city: "Lagos",
-        landmark: "Opposite Falomo Shopping Centre",
-        latitude: 6.4502,
-        longitude: 3.4302,
-      },
-      create: {
-        userId: testUser.id,
-        streetAddress: "12 Awolowo Road",
-        area: "Ikoyi",
-        city: "Lagos",
-        landmark: "Opposite Falomo Shopping Centre",
-        latitude: 6.4502,
-        longitude: 3.4302,
-      },
-    });
-
-    console.log(`  ✓ Test user: +2348030000001 / password123`);
-
-    const riderPasswordHash = await bcrypt.hash("password123", 10);
-    await tx.rider.upsert({
-      where: { phone: "+2348030000002" },
-      update: {
-        passwordHash: riderPasswordHash,
-        isActive: true,
-      },
-      create: {
-        fullName: "Test Rider",
-        phone: "+2348030000002",
-        passwordHash: riderPasswordHash,
-        isActive: true,
-      },
-    });
-
-    console.log(`  ✓ Test rider: +2348030000002 / password123`);
+  const userPasswordHash = await bcrypt.hash("password123", 10);
+  const testUser = await tx.user.upsert({
+    where: { phone: "+2348030000001" },
+    update: {
+      passwordHash: userPasswordHash,
+      phoneVerified: true,
+    },
+    create: {
+      fullName: "Test User",
+      phone: "+2348030000001",
+      passwordHash: userPasswordHash,
+      phoneVerified: true,
+      smsNotifications: true,
+    },
   });
+
+  await tx.address.upsert({
+    where: { userId: testUser.id },
+    update: {
+      streetAddress: "12 Awolowo Road",
+      area: "Ikoyi",
+      city: "Lagos",
+      landmark: "Opposite Falomo Shopping Centre",
+      latitude: 6.4502,
+      longitude: 3.4302,
+    },
+    create: {
+      userId: testUser.id,
+      streetAddress: "12 Awolowo Road",
+      area: "Ikoyi",
+      city: "Lagos",
+      landmark: "Opposite Falomo Shopping Centre",
+      latitude: 6.4502,
+      longitude: 3.4302,
+    },
+  });
+
+  console.log(`  ✓ Test user: +2348030000001 / password123`);
+
+  const riderPasswordHash = await bcrypt.hash("password123", 10);
+  await tx.rider.upsert({
+    where: { phone: "+2348030000002" },
+    update: {
+      passwordHash: riderPasswordHash,
+      isActive: true,
+    },
+    create: {
+      fullName: "Test Rider",
+      phone: "+2348030000002",
+      passwordHash: riderPasswordHash,
+      isActive: true,
+    },
+  });
+
+  console.log(`  ✓ Test rider: +2348030000002 / password123`);
 
   console.log("Done.");
 }
