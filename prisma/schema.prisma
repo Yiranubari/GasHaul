@@ -15,7 +15,7 @@ datasource db {
 model User {
   id              String   @id @default(cuid())
   fullName        String
-  phone           String   @unique // E.164 format, e.g. +2348030000000
+  phone           String   @unique
   passwordHash    String
   phoneVerified   Boolean  @default(false)
   smsNotifications Boolean @default(true)
@@ -31,12 +31,12 @@ model User {
 
 model Address {
   id              String   @id @default(cuid())
-  userId          String   @unique // one address per user for MVP
+  userId          String   @unique
   streetAddress   String
   area            String
   city            String
   landmark        String?
-  latitude        Float?   // populated later if/when you geocode
+  latitude        Float? 
   longitude       Float?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -47,7 +47,7 @@ model Address {
 model OtpCode {
   id          String   @id @default(cuid())
   userId      String
-  codeHash    String   // hash the 4-digit code, don't store plaintext
+  codeHash    String 
   purpose     OtpPurpose
   attempts    Int      @default(0)
   expiresAt   DateTime
@@ -89,7 +89,7 @@ model VendorPricing {
   id           String        @id @default(cuid())
   vendorId     String
   cylinderSize CylinderSize
-  priceKobo    Int           // store in kobo: ₦4,500 = 450000
+  priceKobo    Int     
   updatedAt    DateTime      @updatedAt
 
   vendor       Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
