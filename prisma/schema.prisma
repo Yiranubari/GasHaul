@@ -66,8 +66,8 @@ enum OtpPurpose {
 }
 
 model Vendor {
-  id              String   @id @default(cuid())
-  name            String
+ id              String   @id @default(cuid())
+  name            String   @unique
   latitude        Float
   longitude       Float
   isActive        Boolean  @default(true)
