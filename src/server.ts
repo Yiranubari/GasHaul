@@ -1,7 +1,7 @@
-import { buildApp } from "./app.js";
-import { env } from "./config/env.js";
-import { prisma } from "./config/prisma.js";
-import { logger } from "./utils/logger.js";
+import { buildApp } from "@/app.js";
+import { env } from "@/config/env.js";
+import { prisma } from "@/config/prisma.js";
+import { logger } from "@/utils/logger.js";
 
 async function bootstrap() {
   try {

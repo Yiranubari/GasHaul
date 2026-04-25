@@ -1,5 +1,5 @@
 import express, { type Express } from "express";
-import { errorMiddleware } from "./middleware/error.middleware.js";
+import { errorMiddleware } from "@/middleware/error.middleware.js";
 
 export function buildApp(): Express {
   const app = express();

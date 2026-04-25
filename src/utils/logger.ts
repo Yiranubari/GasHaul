@@ -1,10 +1,7 @@
 import winston from "winston";
-import { env } from "../config/env.js";
-
+import { env } from "@/config/env.js";
 const isProduction = env.NODE_ENV === "production";
 
-// dev: human-readable colorised lines
-// prod: structured JSON for log aggregators
 const devFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: "HH:mm:ss.SSS" }),
