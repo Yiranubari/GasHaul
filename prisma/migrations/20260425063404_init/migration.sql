@@ -160,6 +160,9 @@ CREATE INDEX "OtpCode_userId_purpose_idx" ON "OtpCode"("userId", "purpose");
 CREATE INDEX "OtpCode_expiresAt_idx" ON "OtpCode"("expiresAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Vendor_name_key" ON "Vendor"("name");
+
+-- CreateIndex
 CREATE INDEX "Vendor_isActive_idx" ON "Vendor"("isActive");
 
 -- CreateIndex
