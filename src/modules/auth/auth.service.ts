@@ -8,9 +8,8 @@ import {
   type SignInInput,
   type VerifyOtpInput,
   type ResendOtpInput,
-  resendOtpSchema,
 } from "./auth.schema.js";
-import { PublicUser } from "@/types/auth.js";
+import { type PublicUser } from "@/types/auth.js";
 import {
   BadRequestException,
   NotFoundException,
@@ -18,17 +17,17 @@ import {
   UnauthorizedException,
 } from "@/exceptions/app-exceptions.js";
 
-export class AuthService extends BaseService {
+class AuthService extends BaseService {
   async signup(
     input: SignUpInput,
   ): Promise<{ phone: string; message: string }> {
-    const phone = await this.prisma.user.findUnique({
+    const existingUser = await this.prisma.user.findUnique({
       where: {
         phone: input.phone,
       },
     });
 
-    if (phone?.phoneVerified) {
+    if (existingUser) {
       throw new ConflictException("Phone number is already registered");
     }
 
@@ -42,7 +41,7 @@ export class AuthService extends BaseService {
         smsNotifications: true,
       },
     });
-    const otp = await otpService.issueCode({
+    await otpService.issueCode({
       userId: user.id,
       phone: user.phone,
       purpose: OtpPurpose.PHONE_VERIFICATION,
@@ -62,10 +61,10 @@ export class AuthService extends BaseService {
       throw new BadRequestException("Phone number is already verified");
     }
 
-    const otp = await otpService.verifyCode({
+    await otpService.verifyCode({
       userId: user.id,
       code: input.code,
-      purpose: "PHONE_VERIFICATION",
+      purpose: OtpPurpose.PHONE_VERIFICATION,
     });
 
     const updatedUser = await this.prisma.user.update({
@@ -74,7 +73,7 @@ export class AuthService extends BaseService {
     });
 
     const token = signToken({ sub: user.id, type: "user" });
-    return { token, user: new PublicUser(updatedUser) };
+    return { token, user: toPublicUser(updatedUser) };
   }
 
   async resendOtp(input: ResendOtpInput): Promise<void> {
@@ -91,7 +90,41 @@ export class AuthService extends BaseService {
     await otpService.issueCode({
       userId: user.id,
       phone: user.phone,
-      purpose: "PHONE_VERIFICATION",
+      purpose: OtpPurpose.PHONE_VERIFICATION,
     });
   }
+
+  async signin(
+    input: SignInInput,
+  ): Promise<{ token: string; user: PublicUser }> {
+    const user = await this.prisma.user.findUnique({
+      where: { phone: input.phone },
+    });
+
+    const passwordMatches = await verifyPassword(
+      input.password,
+      user?.passwordHash ?? "",
+    );
+    if (!user || !passwordMatches) {
+      throw new UnauthorizedException("Invalid phone number or password");
+    }
+
+    if (!user.phoneVerified) {
+      throw new UnauthorizedException("Phone number is not verified");
+    }
+
+    const token = signToken({ sub: user.id, type: "user" });
+    return { token, user: toPublicUser(user) };
+  }
 }
+
+function toPublicUser(user: User): PublicUser {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    phone: user.phone,
+    phoneVerified: user.phoneVerified,
+  };
+}
+
+export const authService = new AuthService();

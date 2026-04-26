@@ -10,14 +10,9 @@ export type AuthContext = {
   type: "user" | "rider";
 };
 
-export class PublicUser {
+export type PublicUser = {
   id: string;
   fullName: string;
   phone: string;
-
-  constructor(user: { id: string; fullName: string; phone: string }) {
-    this.id = user.id;
-    this.fullName = user.fullName;
-    this.phone = user.phone;
-  }
-}
+  phoneVerified: boolean;
+};
