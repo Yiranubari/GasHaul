@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import { errorMiddleware } from "@/middleware/error.middleware.js";
+import { authRouter } from "./modules/auth/auth.routes.js";
 
 export function buildApp(): Express {
   const app = express();
@@ -13,7 +14,7 @@ export function buildApp(): Express {
   });
 
   // routes
-  // app.use('/auth', authRoutes);
+  app.use("/auth", authRouter);
   // app.use('/vendors', vendorRoutes);
   // app.use('/orders', orderRoutes);
 
