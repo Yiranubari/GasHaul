@@ -16,3 +16,9 @@ export type PublicUser = {
   phone: string;
   phoneVerified: boolean;
 };
+
+export type PublicRider = {
+  id: string;
+  fullName: string;
+  phone: string;
+};

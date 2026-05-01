@@ -3,6 +3,8 @@ import { errorMiddleware } from "@/middleware/error.middleware.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 import { vendorsRouter } from "./modules/vendors/vendors.routes.js";
+import { riderAuthRouter } from "@/modules/rider/auth/rider-auth.routes.js";
+import { ordersRouter } from "@/modules/orders/orders.routes.js";
 
 export function buildApp(): Express {
   const app = express();
@@ -19,7 +21,8 @@ export function buildApp(): Express {
   app.use("/auth", authRouter);
   app.use("/users", usersRouter);
   app.use("/vendors", vendorsRouter);
-  // app.use('/orders', orderRoutes);
+  app.use("/rider", riderAuthRouter);
+  app.use("/orders", ordersRouter);
 
   // error handler must be last
   app.use(errorMiddleware);
