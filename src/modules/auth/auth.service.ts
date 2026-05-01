@@ -16,11 +16,12 @@ import {
   ConflictException,
   UnauthorizedException,
 } from "@/exceptions/app-exceptions.js";
+import { env } from "@/config/env.js";
 
 class AuthService extends BaseService {
   async signup(
     input: SignUpInput,
-  ): Promise<{ phone: string; message: string }> {
+  ): Promise<{ phone: string; message: string; debugOtp?: string }> {
     const existingUser = await this.prisma.user.findUnique({
       where: {
         phone: input.phone,
@@ -41,12 +42,16 @@ class AuthService extends BaseService {
         smsNotifications: true,
       },
     });
-    await otpService.issueCode({
+    const code = await otpService.issueCode({
       userId: user.id,
       phone: user.phone,
       purpose: OtpPurpose.PHONE_VERIFICATION,
     });
-    return { phone: user.phone, message: "OTP sent successfully" };
+    return {
+      phone: user.phone,
+      message: "OTP sent successfully",
+      ...(env.ENABLE_DEBUG_OTP && { debugOtp: code }),
+    };
   }
 
   async verifyOtp(
@@ -76,7 +81,7 @@ class AuthService extends BaseService {
     return { token, user: toPublicUser(updatedUser) };
   }
 
-  async resendOtp(input: ResendOtpInput): Promise<void> {
+  async resendOtp(input: ResendOtpInput): Promise<{ debugOtp?: string }> {
     const user = await this.prisma.user.findUnique({
       where: { phone: input.phone },
     });
@@ -87,11 +92,12 @@ class AuthService extends BaseService {
       throw new BadRequestException("Phone number is already verified");
     }
 
-    await otpService.issueCode({
+    const code = await otpService.issueCode({
       userId: user.id,
       phone: user.phone,
       purpose: OtpPurpose.PHONE_VERIFICATION,
     });
+    return env.ENABLE_DEBUG_OTP ? { debugOtp: code } : {};
   }
 
   async signin(

@@ -21,7 +21,7 @@ class OtpService extends BaseService {
     userId: string;
     phone: string;
     purpose: OtpPurpose;
-  }): Promise<void> {
+  }): Promise<string> {
     const { userId, phone, purpose } = input;
 
     await this.enforceRateLimits(userId, purpose);
@@ -45,6 +45,7 @@ class OtpService extends BaseService {
     });
 
     logger.info("OTP issued", { userId, purpose });
+    return code;
   }
 
   async verifyCode(input: {
