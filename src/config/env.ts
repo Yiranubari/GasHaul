@@ -19,6 +19,17 @@ const envSchema = z.object({
   SMS_PROVIDER: z.enum(["console", "termii"]).default("console"),
   TERMII_API_KEY: z.string().optional(),
   TERMII_SENDER_ID: z.string().default("Gashaul"),
+
+  // CORS
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:3000,http://localhost:5173"),
+
+  // OTP
+  ENABLE_DEBUG_OTP: z
+    .string()
+    .transform((v) => v === "true")
+    .default(false),
 });
 
 export const env = envSchema.parse(process.env);

@@ -15,8 +15,8 @@ class AuthController extends BaseController {
   };
 
   resendOtp = async (req: Request, res: Response): Promise<void> => {
-    await authService.resendOtp(req.body);
-    this.noContent(res);
+    const result = await authService.resendOtp(req.body);
+    this.ok(res, result);
   };
 
   signin = async (req: Request, res: Response): Promise<void> => {
