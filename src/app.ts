@@ -3,9 +3,20 @@ import { errorMiddleware } from "@/middleware/error.middleware.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 import { vendorsRouter } from "./modules/vendors/vendors.routes.js";
+import { env } from "./config/env.js";
+import cors from "cors";
 
 export function buildApp(): Express {
   const app = express();
+
+  app.set("trust proxy", 1);
+
+  app.use(
+    cors({
+      origin: env.CORS_ORIGINS.split(",").map((s) => s.trim()),
+      credentials: true,
+    }),
+  );
 
   // core middleware
   app.use(express.json({ limit: "1mb" }));
