@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import { errorMiddleware } from "@/middleware/error.middleware.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
+import { vendorsRouter } from "./modules/vendors/vendors.routes.js";
 
 export function buildApp(): Express {
   const app = express();
@@ -17,7 +18,7 @@ export function buildApp(): Express {
   // routes
   app.use("/auth", authRouter);
   app.use("/users", usersRouter);
-  // app.use('/vendors', vendorRoutes);
+  app.use("/vendors", vendorsRouter);
   // app.use('/orders', orderRoutes);
 
   // error handler must be last
