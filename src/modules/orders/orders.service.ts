@@ -1,0 +1,200 @@
+import { BaseService } from "@/core/base-service.js";
+import {
+  type Address,
+  OrderStatus,
+  CylinderSize,
+  Prisma,
+} from "@prisma/client";
+import {
+  type PlaceOrderInput,
+  type CancelOrderInput,
+} from "./orders.schema.js";
+import { canTransition } from "./order-status.machine.js";
+import {
+  BadRequestException,
+  InternalServerException,
+  NotFoundException,
+} from "@/exceptions/app-exceptions.js";
+
+type OrderResponse = {
+  id: string;
+  reference: string;
+  status: OrderStatus;
+  cylinderSize: CylinderSize;
+  priceKoboLocked: number;
+  deliveryAddress: string;
+  vendor: { id: string; name: string };
+  placedAt: Date;
+  riderAssignedAt: Date | null;
+  pickedUpAt: Date | null;
+  refillingAt: Date | null;
+  onTheWayAt: Date | null;
+  deliveredAt: Date | null;
+  cancelledAt: Date | null;
+  cancellationReason: string | null;
+};
+
+type OrderWithIncludes = Prisma.OrderGetPayload<{ include: { vendor: true } }>;
+
+class OrdersService extends BaseService {
+  async placeOrder(
+    userId: string,
+    input: PlaceOrderInput,
+  ): Promise<OrderResponse> {
+    const address = await this.prisma.address.findUnique({
+      where: { userId },
+    });
+
+    if (!address) {
+      throw new BadRequestException(
+        "Please add a delivery address before ordering",
+      );
+    }
+
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: input.vendorId, isActive: true },
+      include: {
+        pricing: { where: { cylinderSize: input.cylinderSize } },
+      },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException("Vendor not found");
+    }
+
+    const [pricing] = vendor.pricing;
+    if (!pricing) {
+      throw new NotFoundException(
+        "This vendor doesn't offer the selected cylinder size",
+      );
+    }
+
+    const priceKoboLocked = pricing.priceKobo;
+    const deliveryAddress = buildAddressSnapshot(address);
+
+    let createdOrder: OrderWithIncludes | null = null;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const reference = generateReferenceCode();
+
+      try {
+        createdOrder = await this.prisma.order.create({
+          data: {
+            reference,
+            userId,
+            vendorId: vendor.id,
+            cylinderSize: input.cylinderSize,
+            priceKoboLocked,
+            deliveryAddress,
+          },
+          include: { vendor: true },
+        });
+        break;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!createdOrder) {
+      throw new InternalServerException(
+        "Failed to generate a unique order reference",
+      );
+    }
+
+    return toOrderResponse(createdOrder);
+  }
+
+  async listMyOrders(userId: string): Promise<OrderResponse[]> {
+    const orders = await this.prisma.order.findMany({
+      where: { userId },
+      include: { vendor: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return orders.map((order) => toOrderResponse(order));
+  }
+
+  async getOrder(userId: string, orderId: string): Promise<OrderResponse> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { vendor: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    return toOrderResponse(order);
+  }
+
+  async cancelOrder(
+    userId: string,
+    orderId: string,
+    input: CancelOrderInput,
+  ): Promise<OrderResponse> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { vendor: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    if (!canTransition(order.status, OrderStatus.CANCELLED)) {
+      throw new BadRequestException("This order can no longer be cancelled");
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.CANCELLED,
+        cancelledAt: new Date(),
+        ...(input.reason !== undefined && {
+          cancellationReason: input.reason,
+        }),
+      },
+      include: { vendor: true },
+    });
+
+    return toOrderResponse(updated);
+  }
+}
+
+function generateReferenceCode(): string {
+  const digits = Math.floor(Math.random() * 90000) + 10000;
+  return `GH-${digits}`;
+}
+
+function buildAddressSnapshot(address: Address): string {
+  const base = `${address.streetAddress}, ${address.area}, ${address.city}`;
+  return address.landmark ? `${base} (${address.landmark})` : base;
+}
+
+function toOrderResponse(order: OrderWithIncludes): OrderResponse {
+  return {
+    id: order.id,
+    reference: order.reference,
+    status: order.status,
+    cylinderSize: order.cylinderSize,
+    priceKoboLocked: order.priceKoboLocked,
+    deliveryAddress: order.deliveryAddress,
+    vendor: { id: order.vendor.id, name: order.vendor.name },
+    placedAt: order.placedAt,
+    riderAssignedAt: order.riderAssignedAt,
+    pickedUpAt: order.pickedUpAt,
+    refillingAt: order.refillingAt,
+    onTheWayAt: order.onTheWayAt,
+    deliveredAt: order.deliveredAt,
+    cancelledAt: order.cancelledAt,
+    cancellationReason: order.cancellationReason,
+  };
+}
+
+export const ordersService = new OrdersService();
