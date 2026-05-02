@@ -26,3 +26,9 @@ ordersRouter.post(
   validate(cancelOrderSchema),
   ordersController.cancel,
 );
+
+ordersRouter.post(
+  "/:id/confirm-delivery",
+  requireUser,
+  ordersController.confirmDelivery,
+);
