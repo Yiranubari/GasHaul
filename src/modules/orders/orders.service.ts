@@ -12,11 +12,12 @@ import {
 import { canTransition } from "./order-status.machine.js";
 import {
   BadRequestException,
+  ConflictException,
   InternalServerException,
   NotFoundException,
 } from "@/exceptions/app-exceptions.js";
 
-type OrderResponse = {
+export type OrderResponse = {
   id: string;
   reference: string;
   status: OrderStatus;
@@ -165,6 +166,38 @@ class OrdersService extends BaseService {
 
     return toOrderResponse(updated);
   }
+
+  async confirmDelivery(
+    userId: string,
+    orderId: string,
+  ): Promise<OrderResponse> {
+    const { count } = await this.prisma.order.updateMany({
+      where: {
+        id: orderId,
+        userId: userId,
+        status: OrderStatus.ON_THE_WAY,
+      },
+      data: {
+        status: OrderStatus.DELIVERED,
+        deliveredAt: new Date(),
+      },
+    });
+
+    if (count === 0) {
+      throw new ConflictException("Cannot confirm delivery for this order");
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { vendor: true },
+    });
+
+    if (!order) {
+      throw new InternalServerException("Order is no longer available");
+    }
+
+    return toOrderResponse(order);
+  }
 }
 
 function generateReferenceCode(): string {
@@ -177,7 +210,7 @@ function buildAddressSnapshot(address: Address): string {
   return address.landmark ? `${base} (${address.landmark})` : base;
 }
 
-function toOrderResponse(order: OrderWithIncludes): OrderResponse {
+export function toOrderResponse(order: OrderWithIncludes): OrderResponse {
   return {
     id: order.id,
     reference: order.reference,

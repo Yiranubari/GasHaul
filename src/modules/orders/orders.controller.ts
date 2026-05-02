@@ -34,6 +34,15 @@ class OrdersController extends BaseController {
     );
     this.ok(res, result);
   };
+
+  confirmDelivery = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new UnauthorizedException();
+    const result = await ordersService.confirmDelivery(
+      req.user.id,
+      req.params.id as string,
+    );
+    this.ok(res, result);
+  };
 }
 
 export const ordersController = new OrdersController();

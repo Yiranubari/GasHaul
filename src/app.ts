@@ -7,6 +7,7 @@ import { riderAuthRouter } from "@/modules/rider/auth/rider-auth.routes.js";
 import { ordersRouter } from "@/modules/orders/orders.routes.js";
 import { env } from "./config/env.js";
 import cors from "cors";
+import { riderOrdersRouter } from "@/modules/rider/orders/rider-orders.routes.js";
 
 export function buildApp(): Express {
   const app = express();
@@ -33,6 +34,7 @@ export function buildApp(): Express {
   app.use("/users", usersRouter);
   app.use("/vendors", vendorsRouter);
   app.use("/rider", riderAuthRouter);
+  app.use("/rider/orders", riderOrdersRouter);
   app.use("/orders", ordersRouter);
 
   // error handler must be last
