@@ -1,13 +1,16 @@
 import { BaseService } from "@/core/base-service.js";
 import {
   toOrderResponse,
+  toReceiptResponse,
   type OrderResponse,
+  type ReceiptResponse,
 } from "@/modules/orders/orders.service.js";
 import { OrderStatus, Prisma } from "@prisma/client";
 import {
   ConflictException,
   InternalServerException,
 } from "@/exceptions/app-exceptions.js";
+import { type SubmitReceiptInput } from "./rider-orders.schema.js";
 
 class RiderOrdersService extends BaseService {
   async listAvailable(): Promise<OrderResponse[]> {
@@ -97,6 +100,66 @@ class RiderOrdersService extends BaseService {
     return toOrderResponse(order);
   }
 
+  async submitReceipt(
+    riderId: string,
+    orderId: string,
+    input: SubmitReceiptInput,
+  ): Promise<{ order: OrderResponse; receipt: ReceiptResponse }> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          riderId: riderId,
+          status: OrderStatus.RIDER_ASSIGNED,
+        },
+        data: {
+          status: OrderStatus.CYLINDER_PICKED_UP,
+          pickedUpAt: new Date(),
+        },
+      });
+
+      if (count === 0) {
+        throw new ConflictException("Cannot submit receipt for this order");
+      }
+
+      let receipt;
+      try {
+        receipt = await tx.cylinderReceipt.create({
+          data: {
+            orderId,
+            cylinderSerial: input.cylinderSerial,
+            weightBeforeKg: input.weightBeforeKg,
+            photoUrl: input.photoUrl,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          throw new ConflictException(
+            "Receipt already submitted for this order",
+          );
+        }
+        throw err;
+      }
+
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { vendor: true },
+      });
+
+      if (!order) {
+        throw new InternalServerException("Order disappeared after update");
+      }
+
+      return {
+        order: toOrderResponse(order),
+        receipt: toReceiptResponse(receipt),
+      };
+    });
+  }
+
   async refilling(riderId: string, orderId: string): Promise<OrderResponse> {
     return this.transition(
       riderId,
@@ -104,6 +167,7 @@ class RiderOrdersService extends BaseService {
       OrderStatus.CYLINDER_PICKED_UP,
       OrderStatus.REFILLING_IN_PROGRESS,
       "refillingAt",
+      { receipt: { is: { userConfirmedAt: { not: null } } } },
     );
   }
 
@@ -123,12 +187,14 @@ class RiderOrdersService extends BaseService {
     fromStatus: OrderStatus,
     toStatus: OrderStatus,
     timestampField: "pickedUpAt" | "refillingAt" | "onTheWayAt" | "deliveredAt",
+    extraWhere: Prisma.OrderWhereInput = {},
   ): Promise<OrderResponse> {
     const { count } = await this.prisma.order.updateMany({
       where: {
         id: orderId,
         riderId: riderId,
         status: fromStatus,
+        ...extraWhere,
       },
       data: {
         status: toStatus,

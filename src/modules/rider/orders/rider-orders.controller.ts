@@ -34,6 +34,16 @@ class RiderOrdersController extends BaseController {
     this.ok(res, result);
   };
 
+  submitReceipt = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new UnauthorizedException();
+    const result = await riderOrdersService.submitReceipt(
+      req.user.id,
+      req.params.id as string,
+      req.body,
+    );
+    this.created(res, result);
+  };
+
   refilling = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw new UnauthorizedException();
     const result = await riderOrdersService.refilling(
