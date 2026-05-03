@@ -1,6 +1,7 @@
 import { BaseService } from "@/core/base-service.js";
 import {
   type Address,
+  type CylinderReceipt,
   OrderStatus,
   CylinderSize,
   Prisma,
@@ -33,6 +34,16 @@ export type OrderResponse = {
   deliveredAt: Date | null;
   cancelledAt: Date | null;
   cancellationReason: string | null;
+};
+
+export type ReceiptResponse = {
+  id: string;
+  orderId: string;
+  cylinderSerial: string;
+  weightBeforeKg: number;
+  photoUrl: string;
+  loggedAt: Date;
+  userConfirmedAt: Date | null;
 };
 
 type OrderWithIncludes = Prisma.OrderGetPayload<{ include: { vendor: true } }>;
@@ -134,6 +145,51 @@ class OrdersService extends BaseService {
     return toOrderResponse(order);
   }
 
+  async getReceipt(userId: string, orderId: string): Promise<ReceiptResponse> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { receipt: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    if (!order.receipt) {
+      throw new NotFoundException("Receipt not yet submitted");
+    }
+
+    return toReceiptResponse(order.receipt);
+  }
+
+  async confirmReceipt(
+    userId: string,
+    orderId: string,
+  ): Promise<ReceiptResponse> {
+    const { count } = await this.prisma.cylinderReceipt.updateMany({
+      where: {
+        orderId,
+        userConfirmedAt: null,
+        order: { is: { userId } },
+      },
+      data: { userConfirmedAt: new Date() },
+    });
+
+    if (count === 0) {
+      throw new ConflictException("Cannot confirm this receipt");
+    }
+
+    const receipt = await this.prisma.cylinderReceipt.findFirst({
+      where: { orderId, order: { is: { userId } } },
+    });
+
+    if (!receipt) {
+      throw new InternalServerException("Receipt is no longer available");
+    }
+
+    return toReceiptResponse(receipt);
+  }
+
   async cancelOrder(
     userId: string,
     orderId: string,
@@ -227,6 +283,18 @@ export function toOrderResponse(order: OrderWithIncludes): OrderResponse {
     deliveredAt: order.deliveredAt,
     cancelledAt: order.cancelledAt,
     cancellationReason: order.cancellationReason,
+  };
+}
+
+export function toReceiptResponse(receipt: CylinderReceipt): ReceiptResponse {
+  return {
+    id: receipt.id,
+    orderId: receipt.orderId,
+    cylinderSerial: receipt.cylinderSerial,
+    weightBeforeKg: receipt.weightBeforeKg,
+    photoUrl: receipt.photoUrl,
+    loggedAt: receipt.loggedAt,
+    userConfirmedAt: receipt.userConfirmedAt,
   };
 }
 

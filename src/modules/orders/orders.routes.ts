@@ -20,6 +20,8 @@ ordersRouter.get("/", requireUser, ordersController.listMine);
 
 ordersRouter.get("/:id", requireUser, ordersController.get);
 
+ordersRouter.get("/:id/receipt", requireUser, ordersController.getReceipt);
+
 ordersRouter.post(
   "/:id/cancel",
   requireUser,
@@ -31,4 +33,10 @@ ordersRouter.post(
   "/:id/confirm-delivery",
   requireUser,
   ordersController.confirmDelivery,
+);
+
+ordersRouter.post(
+  "/:id/confirm-receipt",
+  requireUser,
+  ordersController.confirmReceipt,
 );
