@@ -5,6 +5,7 @@ import { ordersController } from "@/modules/orders/orders.controller.js";
 import {
   placeOrderSchema,
   cancelOrderSchema,
+  submitFeedbackSchema,
 } from "@/modules/orders/orders.schema.js";
 
 export const ordersRouter = Router();
@@ -21,6 +22,13 @@ ordersRouter.get("/", requireUser, ordersController.listMine);
 ordersRouter.get("/:id", requireUser, ordersController.get);
 
 ordersRouter.get("/:id/receipt", requireUser, ordersController.getReceipt);
+
+ordersRouter.post(
+  "/:id/feedback",
+  requireUser,
+  validate(submitFeedbackSchema),
+  ordersController.submitFeedback,
+);
 
 ordersRouter.post(
   "/:id/cancel",

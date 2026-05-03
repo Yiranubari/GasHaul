@@ -2,6 +2,7 @@ import { BaseService } from "@/core/base-service.js";
 import {
   type Address,
   type CylinderReceipt,
+  type Feedback,
   OrderStatus,
   CylinderSize,
   Prisma,
@@ -9,8 +10,10 @@ import {
 import {
   type PlaceOrderInput,
   type CancelOrderInput,
+  type SubmitFeedbackInput,
 } from "./orders.schema.js";
 import { canTransition } from "./order-status.machine.js";
+import { trustScoreService } from "@/modules/vendors/trust-score.service.js";
 import {
   BadRequestException,
   ConflictException,
@@ -44,6 +47,15 @@ export type ReceiptResponse = {
   photoUrl: string;
   loggedAt: Date;
   userConfirmedAt: Date | null;
+};
+
+export type FeedbackResponse = {
+  id: string;
+  orderId: string;
+  cylinderFull: boolean;
+  hadIssues: boolean;
+  issueDetails: string | null;
+  submittedAt: Date;
 };
 
 type OrderWithIncludes = Prisma.OrderGetPayload<{ include: { vendor: true } }>;
@@ -190,6 +202,50 @@ class OrdersService extends BaseService {
     return toReceiptResponse(receipt);
   }
 
+  async submitFeedback(
+    userId: string,
+    orderId: string,
+    input: SubmitFeedbackInput,
+  ): Promise<FeedbackResponse> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, userId, status: OrderStatus.DELIVERED },
+      });
+
+      if (!order) {
+        throw new BadRequestException("Cannot submit feedback for this order");
+      }
+
+      let feedback;
+      try {
+        feedback = await tx.feedback.create({
+          data: {
+            orderId,
+            cylinderFull: input.cylinderFull,
+            hadIssues: input.hadIssues,
+            ...(input.issueDetails !== undefined && {
+              issueDetails: input.issueDetails,
+            }),
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          throw new ConflictException(
+            "Feedback already submitted for this order",
+          );
+        }
+        throw err;
+      }
+
+      await trustScoreService.recompute(order.vendorId, tx);
+
+      return toFeedbackResponse(feedback);
+    });
+  }
+
   async cancelOrder(
     userId: string,
     orderId: string,
@@ -295,6 +351,17 @@ export function toReceiptResponse(receipt: CylinderReceipt): ReceiptResponse {
     photoUrl: receipt.photoUrl,
     loggedAt: receipt.loggedAt,
     userConfirmedAt: receipt.userConfirmedAt,
+  };
+}
+
+export function toFeedbackResponse(feedback: Feedback): FeedbackResponse {
+  return {
+    id: feedback.id,
+    orderId: feedback.orderId,
+    cylinderFull: feedback.cylinderFull,
+    hadIssues: feedback.hadIssues,
+    issueDetails: feedback.issueDetails,
+    submittedAt: feedback.submittedAt,
   };
 }
 
