@@ -43,6 +43,16 @@ class OrdersController extends BaseController {
     this.ok(res, result);
   };
 
+  submitFeedback = async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw new UnauthorizedException();
+    const result = await ordersService.submitFeedback(
+      req.user.id,
+      req.params.id as string,
+      req.body,
+    );
+    this.created(res, result);
+  };
+
   cancel = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw new UnauthorizedException();
     const result = await ordersService.cancelOrder(
